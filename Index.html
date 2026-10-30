@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi Rutina — Editor</title>
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--line:#262b36;--txt:#e8ebf2;--mut:#8b93a7;--acc:#4f8cff;--ok:#2ecc71;--dan:#ff5c5c}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);padding:20px}
+  header{max-width:1150px;margin:0 auto 22px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  h1{font-size:20px;letter-spacing:2px;margin:0;text-transform:uppercase}
+  h1 span{color:var(--acc)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  button{background:#222835;color:var(--txt);border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  button:hover{background:#2c3444;border-color:#3a4459}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  button.primary:hover{background:#3b7bf0}
+  button.danger{background:transparent;border-color:#4a2a2a;color:var(--dan)}
+  button.danger:hover{background:#2a1a1a}
+  main{max-width:1150px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+  .day{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .day-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 16px;background:#1c212b;border-bottom:1px solid var(--line)}
+  .day-name{background:transparent;border:none;color:var(--acc);font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;outline:none;flex:1;min-width:220px;padding:4px 0}
+  .day-name:focus{border-bottom:1px dashed var(--acc)}
+  .day-actions{display:flex;gap:6px}
+  .day-actions button{padding:5px 10px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;color:var(--mut);font-weight:600;font-size:11px;letter-spacing:.7px;text-transform:uppercase;padding:10px 10px;border-bottom:1px solid var(--line)}
+  td{padding:4px 6px;border-bottom:1px solid #1e232d}
+  tr:last-child td{border-bottom:none}
+  td input[type=text]{width:100%;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--txt);padding:7px 8px;font-size:13.5px;font-family:inherit;outline:none;transition:.15s}
+  td input[type=text]:hover{border-color:#2c3444}
+  td input[type=text]:focus{background:#0f131a;border-color:var(--acc)}
+  td input[type=checkbox]{width:17px;height:17px;accent-color:var(--ok);cursor:pointer}
+  .c-check{width:42px;text-align:center}
+  .c-num{width:78px}
+  .c-notas{width:24%}
+  .c-del{width:40px;text-align:center}
+  tr.done td input[type=text]{color:#6f7a90;text-decoration:line-through}
+  .del-row{background:transparent;border:none;color:#4a5266;font-size:16px;cursor:pointer;padding:2px 6px;border-radius:6px}
+  .del-row:hover{color:var(--dan);background:#2a1a1a}
+  footer{max-width:1150px;margin:26px auto 40px;color:var(--mut);font-size:12px;text-align:center;line-height:1.7}
+  @media(max-width:720px){.c-notas{display:none}th:nth-child(6){display:none}}
+  @media print{
+    body{background:#fff;color:#000;padding:0}
+    header,footer,.day-actions,.c-del,.c-check{display:none!important}
+    .day{background:#fff;border:1px solid #ccc;page-break-inside:avoid;border-radius:0}
+    .day-head{background:#eee}
+    .day-name{color:#000}
+    td input[type=text]{color:#000;border:none}
+    th{color:#555}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mi Rutina <span>Semanal</span></h1>
+  <div class="toolbar">
+    <button id="addDay" class="primary">+ Día</button>
+    <button id="export">⬇ Exportar</button>
+    <button id="importBtn">⬆ Importar</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+    <button id="print">🖨 Imprimir</button>
+    <button id="reset" class="danger">Reset</button>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer>
+  Se guarda automáticamente en este navegador · Exporta el JSON para hacer copia de seguridad<br>
+  Progresión: sube reps dentro del rango → luego +2,5‑5 kg → vuelve al rango bajo.
+</footer>
+
+<script>
+const KEY = 'rutina_v2';
+const uid = () => Math.random().toString(36).slice(2, 9);
+const ex = (nombre, series, reps, peso = '', notas = '') =>
+  ({ id: uid(), nombre, series, reps, peso, notas, hecho: false });
+const dia = (nombre, ejercicios) => ({ id: uid(), nombre, ejercicios });
+
+const DEFAULT = [
+  dia('LUNES — Pecho, Hombro y Bíceps', [
+    ex('Press banca con barra','4','6-8','','RIR 1-2 · 150s'),
+    ex('Press inclinado mancuernas','3','8-10','','RIR 1-2 · 120s'),
+    ex('Aperturas en polea','3','12-15','','RIR 0-1 · 60s'),
+    ex('Press militar mancuernas','4','8-10','','RIR 1-2 · 120s'),
+    ex('Elevaciones laterales','3','12-15','','RIR 0-1 · 60s'),
+    ex('Face pull / pájaros','3','15','','RIR 0-1 · 45s'),
+    ex('Curl con barra','3','8-10','','RIR 0-1 · 60s'),
+    ex('Curl martillo','3','12','','RIR 0-1 · 45s'),
+    ex('Plancha','3','45 s','','—'),
+    ex('Crunch en polea','3','15','','RIR 0-1 · 45s')
+  ]),
+  dia('MARTES — Espalda y Tríceps', [
+    ex('Jalón al pecho agarre neutro','4','8-10','','RIR 1-2 · 120s'),
+    ex('Remo con barra 45°','4','6-8','','RIR 1-2 · 150s'),
+    ex('Remo unilateral mancuerna','3','10-12','','RIR 1 · 90s'),
+    ex('Pull-down brazos rectos','3','12-15','','RIR 0-1 · 60s'),
+    ex('Fondos en paralelas / press cerrado','4','8-10','','RIR 1-2 · 120s'),
+    ex('Extensión tríceps en polea','3','12','','RIR 0-1 · 60s'),
+    ex('Extensión sobre la cabeza','3','12-15','','RIR 0-1 · 45s')
+  ]),
+  dia('MIÉRCOLES — Pierna completa + Abdomen', [
+    ex('Sentadilla','4','6-8','','RIR 1-2 · 180s'),
+    ex('Prensa de piernas','3','10-12','','RIR 1 · 120s'),
+    ex('Peso muerto rumano','3','8-10','','RIR 1-2 · 150s'),
+    ex('Zancadas caminando','3','12 / pierna','','RIR 1 · 90s'),
+    ex('Curl femoral tumbado','3','12','','RIR 0-1 · 60s'),
+    ex('Extensión de cuádriceps','3','15','','RIR 0-1 · 60s'),
+    ex('Gemelos de pie','4','15-20','','RIR 0-1 · 45s'),
+    ex('Elevación de piernas','3','15','','—'),
+    ex('Rueda abdominal','3','15','','—')
+  ]),
+  dia('JUEVES — Pecho, Hombro y Bíceps', [
+    ex('Press banca con barra','4','6-8','','RIR 1-2 · 150s'),
+    ex('Press inclinado mancuernas','3','8-10','','RIR 1-2 · 120s'),
+    ex('Aperturas en polea','3','12-15','','RIR 0-1 · 60s'),
+    ex('Press militar mancuernas','4','8-10','','RIR 1-2 · 120s'),
+    ex('Elevaciones laterales','3','12-15','','RIR 0-1 · 60s'),
+    ex('Face pull / pájaros','3','15','','RIR 0-1 · 45s'),
+    ex('Curl con barra','3','8-10','','RIR 0-1 · 60s'),
+    ex('Curl martillo','3','12','','RIR 0-1 · 45s')
+  ]),
+  dia('VIERNES — Espalda, Tríceps + Abdomen', [
+    ex('Jalón al pecho agarre neutro','4','8-10','','RIR 1-2 · 120s'),
+    ex('Remo con barra 45°','4','6-8','','RIR 1-2 · 150s'),
+    ex('Remo unilateral mancuerna','3','10-12','','RIR 1 · 90s'),
+    ex('Pull-down brazos rectos','3','12-15','','RIR 0-1 · 60s'),
+    ex('Fondos en paralelas / press cerrado','4','8-10','','RIR 1-2 · 120s'),
+    ex('Extensión tríceps en polea','3','12','','RIR 0-1 · 60s'),
+    ex('Extensión sobre la cabeza','3','12-15','','RIR 0-1 · 45s'),
+    ex('Crunch en polea','3','15','','—'),
+    ex('Plancha lateral','3','30 s / lado','','—')
+  ]),
+  dia('SÁBADO — Pierna: Isquios + Cuádriceps', [
+    ex('Peso muerto rumano con barra','4','8','','RIR 1-2 · 150s'),
+    ex('Curl femoral tumbado','4','10-12','','RIR 0-1 · 90s'),
+    ex('Peso muerto piernas rígidas mancuernas','3','12','','RIR 1 · 90s'),
+    ex('Extensión de cuádriceps','4','12-15','','RIR 0-1 · 60s'),
+    ex('Sentadilla búlgara','3','10 / pierna','','RIR 1 · 90s'),
+    ex('Hip thrust','3','12','','RIR 1 · 90s'),
+    ex('Gemelos sentado','4','20','','RIR 0-1 · 45s')
+  ])
+];
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let data;
+try { data = JSON.parse(localStorage.getItem(KEY)) || structuredClone(DEFAULT); }
+catch { data = structuredClone(DEFAULT); }
+if (!Array.isArray(data) || !data.length) data = structuredClone(DEFAULT);
+
+const save = () => localStorage.setItem(KEY, JSON.stringify(data));
+
+function render() {
+  document.getElementById('app').innerHTML = data.map((d, di) => `
+    <section class="day">
+      <div class="day-head">
+        <input class="day-name" data-di="${di}" value="${esc(d.nombre)}" spellcheck="false">
+        <div class="day-actions">
+          <button data-act="up" data-di="${di}" title="Subir">↑</button>
+          <button data-act="down" data-di="${di}" title="Bajar">↓</button>
+          <button class="primary" data-act="addEx" data-di="${di}">+ Ejercicio</button>
+          <button class="danger" data-act="delDay" data-di="${di}" title="Eliminar día">✕</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="c-check">✓</th><th>Ejercicio</th><th class="c-num">Series</th>
+          <th class="c-num">Reps</th><th class="c-num">Peso (kg)</th>
+          <th class="c-notas">Notas / RIR</th><th class="c-del"></th>
+        </tr></thead>
+        <tbody>
+          ${d.ejercicios.map((e, ei) => `
+            <tr class="${e.hecho ? 'done' : ''}">
+              <td class="c-check"><input type="checkbox" data-act="done" data-di="${di}" data-ei="${ei}" ${e.hecho ? 'checked' : ''}></td>
+              <td><input type="text" data-act="f" data-f="nombre" data-di="${di}" data-ei="${ei}" value="${esc(e.nombre)}" placeholder="Ejercicio"></td>
+              <td><input type="text" data-act="f" data-f="series" data-di="${di}" data-ei="${ei}" value="${esc(e.series)}" placeholder="3"></td>
+              <td><input type="text" data-act="f" data-f="reps" data-di="${di}" data-ei="${ei}" value="${esc(e.reps)}" placeholder="10-12"></td>
+              <td><input type="text" data-act="f" data-f="peso" data-di="${di}" data-ei="${ei}" value="${esc(e.peso)}" placeholder="—"></td>
+              <td class="c-notas"><input type="text" data-act="f" data-f="notas" data-di="${di}" data-ei="${ei}" value="${esc(e.notas)}" placeholder="RIR / descanso"></td>
+              <td class="c-del"><button class="del-row" data-act="delEx" data-di="${di}" data-ei="${ei}" title="Eliminar">✕</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`).join('');
+}
+
+const app = document.getElementById('app');
+
+app.addEventListener('input', ev => {
+  const t = ev.target, di = +t.dataset.di;
+  if (t.classList.contains('day-name')) { data[di].nombre = t.value; save(); return; }
+  if (t.dataset.act === 'f') {
+    data[di].ejercicios[+t.dataset.ei][t.dataset.f] = t.value;
+    save();
+  }
+});
+
+app.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.dataset.act === 'done') {
+    const e = data[+t.dataset.di].ejercicios[+t.dataset.ei];
+    e.hecho = t.checked;
+    t.closest('tr').classList.toggle('done', e.hecho);
+    save();
+  }
+});
+
+app.addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-act]');
+  if (!b) return;
+  const di = +b.dataset.di, ei = +b.dataset.ei, act = b.dataset.act;
+
+  if (act === 'addEx') {
+    data[di].ejercicios.push(ex('Nuevo ejercicio', '3', '10-12'));
+  } else if (act === 'delEx') {
+    data[di].ejercicios.splice(ei, 1);
+  } else if (act === 'delDay') {
+    if (!confirm('¿Eliminar este día completo?')) return;
+    data.splice(di, 1);
+  } else if (act === 'up' && di > 0) {
+    [data[di - 1], data[di]] = [data[di], data[di - 1]];
+  } else if (act === 'down' && di < data.length - 1) {
+    [data[di + 1], data[di]] = [data[di], data[di + 1]];
+  } else return;
+
+  save(); render();
+});
+
+document.getElementById('addDay').onclick = () => {
+  data.push(dia('NUEVO DÍA', [ex('Nuevo ejercicio', '3', '10-12')]));
+  save(); render();
+};
+
+document.getElementById('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mi-rutina-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      if (!Array.isArray(parsed)) throw 0;
+      data = parsed; save(); render();
+    } catch { alert('Archivo no válido.'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+};
+
+document.getElementById('print').onclick = () => window.print();
+
+document.getElementById('reset').onclick = () => {
+  if (!confirm('Esto borrará tus cambios y restaurará la rutina original. ¿Continuar?')) return;
+  data = structuredClone(DEFAULT); save(); render();
+};
+
+render();
+</script>
+</body>
+</html>
